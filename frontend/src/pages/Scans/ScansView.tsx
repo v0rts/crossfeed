@@ -156,6 +156,7 @@ const ScansView: React.FC = () => {
     frequency: 1,
     frequencyUnit: 'minute',
     isGranular: false,
+    isUserModifiable: false,
     isSingleScan: false,
     tags: []
   });
@@ -191,7 +192,7 @@ const ScansView: React.FC = () => {
   const deleteRow = async (index: number) => {
     try {
       const row = scans[index];
-      await apiDelete(`/scans/${row.id}`);
+      await apiDelete(`/scans/${row.id}`, { body: {} });
       setScans(scans.filter((scan) => scan.id !== row.id));
     } catch (e) {
       setErrors({
@@ -229,7 +230,7 @@ const ScansView: React.FC = () => {
   const invokeScheduler = async () => {
     setErrors({ ...errors, scheduler: '' });
     try {
-      await apiPost('/scheduler/invoke', {});
+      await apiPost('/scheduler/invoke', { body: {} });
     } catch (e) {
       console.error(e);
       setErrors({ ...errors, scheduler: 'Invocation failed.' });
@@ -244,7 +245,7 @@ const ScansView: React.FC = () => {
   const runScan = async (index: number) => {
     const row = scans[index];
     try {
-      await apiPost(`/scans/${row.id}/run`);
+      await apiPost(`/scans/${row.id}/run`, { body: {} });
     } catch (e) {
       console.error(e);
       setErrors({ ...errors, scheduler: 'Run failed.' });

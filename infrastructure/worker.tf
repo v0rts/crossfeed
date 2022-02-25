@@ -3,7 +3,7 @@ resource "aws_ecr_repository" "worker" {
   image_scanning_configuration {
     scan_on_push = true
   }
-  image_tag_mutability = "IMMUTABLE"
+  image_tag_mutability = "MUTABLE"
 
   encryption_configuration {
     encryption_type = "KMS"
@@ -272,7 +272,7 @@ resource "aws_ecs_task_definition" "worker" {
 resource "aws_cloudwatch_log_group" "worker" {
   name              = var.worker_ecs_log_group_name # should match awslogs-group in service.json
   retention_in_days = 3653
-  kms_key_id        = aws_kms_key.key.id
+  kms_key_id        = aws_kms_key.key.arn
   tags = {
     Project = var.project
     Stage   = var.stage
@@ -309,7 +309,7 @@ resource "aws_s3_bucket" "export_bucket" {
 
   versioning {
     enabled    = true
-    mfa_delete = true
+    mfa_delete = false
   }
 
   logging {

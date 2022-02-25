@@ -305,7 +305,7 @@ export const Organization: React.FC = () => {
     try {
       await apiPost(
         `/organizations/${organization?.id}/roles/${organization?.userRoles[user].id}/approve`,
-        {}
+        { body: {} }
       );
       const copy = userRoles.map((role, id) =>
         id === user ? { ...role, approved: true } : role
@@ -320,7 +320,7 @@ export const Organization: React.FC = () => {
     try {
       await apiPost(
         `/organizations/${organization?.id}/roles/${userRoles[user].id}/remove`,
-        {}
+        { body: {} }
       );
       const copy = userRoles.filter((_, ind) => ind !== user);
       setUserRoles(copy);
@@ -634,6 +634,34 @@ export const Organization: React.FC = () => {
             domains, and notes. Organization administrators can additionally
             manage members and update the organization.
           </p>
+          <TextField
+            margin="dense"
+            id="firstName"
+            name="firstName"
+            label="First Name"
+            type="text"
+            fullWidth
+            value={newUserValues.firstName}
+            onChange={onInviteUserTextChange}
+            variant="filled"
+            InputProps={{
+              className: classes.textField
+            }}
+          />
+          <TextField
+            margin="dense"
+            id="lastName"
+            name="lastName"
+            label="Last Name"
+            type="text"
+            fullWidth
+            value={newUserValues.lastName}
+            onChange={onInviteUserTextChange}
+            variant="filled"
+            InputProps={{
+              className: classes.textField
+            }}
+          />
           <TextField
             margin="dense"
             id="email"

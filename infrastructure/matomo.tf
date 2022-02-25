@@ -166,7 +166,7 @@ resource "aws_ecs_service" "matomo" {
 resource "aws_cloudwatch_log_group" "matomo" {
   name              = var.matomo_ecs_log_group_name
   retention_in_days = 3653
-  kms_key_id        = aws_kms_key.key.id
+  kms_key_id        = aws_kms_key.key.arn
   tags = {
     Project = var.project
     Stage   = var.stage
@@ -179,19 +179,18 @@ resource "random_password" "matomo_db_password" {
 }
 
 resource "aws_db_instance" "matomo_db" {
-  identifier                          = var.matomo_db_name
-  instance_class                      = var.matomo_db_instance_class
-  allocated_storage                   = 20
-  max_allocated_storage               = 1000
-  storage_type                        = "gp2"
-  engine                              = "mariadb"
-  engine_version                      = "10.4"
-  skip_final_snapshot                 = true
-  availability_zone                   = data.aws_availability_zones.available.names[0]
-  multi_az                            = false
-  backup_retention_period             = 35
-  storage_encrypted                   = true
-  iam_database_authentication_enabled = true
+  identifier              = var.matomo_db_name
+  instance_class          = var.matomo_db_instance_class
+  allocated_storage       = 20
+  max_allocated_storage   = 1000
+  storage_type            = "gp2"
+  engine                  = "mariadb"
+  engine_version          = "10.4"
+  skip_final_snapshot     = true
+  availability_zone       = data.aws_availability_zones.available.names[0]
+  multi_az                = false
+  backup_retention_period = 35
+  storage_encrypted       = true
 
   // database information
   name     = "matomo"
