@@ -1,6 +1,6 @@
 requests-http-signature==0.2.0
 requests==2.24.0
-mitmproxy==7.0.3
+mitmproxy==8.0.0
 cryptography==3.3.2
 pytest==6.0.1
 # TODO: once scrapy releases version 2.6.0 with this change in it (https://github.com/scrapy/scrapy/issues/5267), switch back to using scrapy from PyPI.
