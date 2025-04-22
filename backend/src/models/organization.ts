@@ -13,8 +13,12 @@ import {
 import { Domain, Role, Scan, ScanTask, OrganizationTag } from '.';
 import { User } from './user';
 
+export interface PendingDomain {
+  name: string;
+  token: string;
+}
+
 @Entity()
-@Index(['name'], { unique: true })
 export class Organization extends BaseEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -24,6 +28,13 @@ export class Organization extends BaseEntity {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @Index({ unique: true })
+  @Column({
+    nullable: true,
+    unique: true
+  })
+  acronym: string;
 
   @Column()
   name: string;
@@ -42,6 +53,9 @@ export class Organization extends BaseEntity {
     onUpdate: 'CASCADE'
   })
   domains: Domain[];
+
+  @Column('json', { default: '[]' })
+  pendingDomains: PendingDomain[];
 
   @OneToMany((type) => Role, (role) => role.organization, {
     onDelete: 'CASCADE',
@@ -103,4 +117,44 @@ export class Organization extends BaseEntity {
     onUpdate: 'CASCADE'
   })
   createdBy: User;
+
+  @Column({
+    nullable: true
+  })
+  country: string;
+
+  @Column({
+    nullable: true
+  })
+  state: string;
+
+  @Column({
+    nullable: true
+  })
+  regionId: string;
+
+  @Column({
+    nullable: true
+  })
+  stateFips: number;
+
+  @Column({
+    nullable: true
+  })
+  stateName: string;
+
+  @Column({
+    nullable: true
+  })
+  county: string;
+
+  @Column({
+    nullable: true
+  })
+  countyFips: number;
+
+  @Column({
+    nullable: true
+  })
+  type: string;
 }

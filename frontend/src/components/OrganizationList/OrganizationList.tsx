@@ -1,10 +1,13 @@
 import React, { useState, useCallback } from 'react';
+import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined';
 import { Organization } from 'types';
-import { Grid, Paper, makeStyles } from '@material-ui/core';
+import { Alert, Box, Button, IconButton, Grid } from '@mui/material';
+import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import { useHistory } from 'react-router-dom';
-import { Add } from '@material-ui/icons';
+import { Add } from '@mui/icons-material';
 import { OrganizationForm } from 'components/OrganizationForm';
 import { useAuthContext } from 'context';
+import CustomToolbar from 'components/DataGrid/CustomToolbar';
 
 export const OrganizationList: React.FC<{
   parent?: Organization;
@@ -13,7 +16,31 @@ export const OrganizationList: React.FC<{
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const history = useHistory();
-  const classes = useStyles();
+  const getOrgsURL = `/v2/organizations/`;
+
+  const orgCols: GridColDef[] = [
+    { field: 'name', headerName: 'Organization', minWidth: 100, flex: 2 },
+    // { field: 'userCount', headerName: 'Members', minWidth: 100, flex: 1 },
+    { field: 'state', headerName: 'State', minWidth: 100, flex: 1 },
+    { field: 'regionId', headerName: 'Region', minWidth: 100, flex: 1 },
+    // { field: 'tagNames', headerName: 'Tags', minWidth: 100, flex: 1 },
+    {
+      field: 'view',
+      headerName: 'View/Edit',
+      minWidth: 100,
+      flex: 1,
+      renderCell: (cellValues: GridRenderCellParams) => {
+        return (
+          <IconButton
+            color="primary"
+            onClick={() => history.push('/organizations/' + cellValues.row.id)}
+          >
+            <EditNoteOutlinedIcon />
+          </IconButton>
+        );
+      }
+    }
+  ];
 
   const onSubmit = async (body: Object) => {
     try {
@@ -35,12 +62,16 @@ export const OrganizationList: React.FC<{
 
   const fetchOrganizations = useCallback(async () => {
     try {
-      const rows = await apiGet<Organization[]>('/organizations/');
+      const rows = await apiGet<Organization[]>(getOrgsURL);
+      // rows.forEach((obj) => {
+      //   // obj.userCount = obj.userRoles.length;
+      //   obj.tagNames = obj.tags.map((tag) => tag.name);
+      // });
       setOrganizations(rows);
     } catch (e) {
       console.error(e);
     }
-  }, [apiGet]);
+  }, [apiGet, getOrgsURL]);
 
   React.useEffect(() => {
     if (!parent) fetchOrganizations();
@@ -49,47 +80,38 @@ export const OrganizationList: React.FC<{
     }
   }, [fetchOrganizations, parent]);
 
+  const addOrgButton = user?.userType === 'globalAdmin' && (
+    <Button
+      size="small"
+      sx={{ '& .MuiButton-startIcon': { mr: '2px', mb: '2px' } }}
+      startIcon={<Add />}
+      onClick={() => setDialogOpen(true)}
+    >
+      Create New Organization
+    </Button>
+  );
+
   return (
-    <>
+    <Box mb={3}>
       <Grid
         container
         spacing={2}
         style={{ margin: '0 auto', marginTop: '1rem', maxWidth: '1000px' }}
-      >
-        {user?.userType === 'globalAdmin' && (
-          <Grid item>
-            <Paper
-              elevation={0}
-              classes={{ root: classes.cardRoot }}
-              style={{ border: '1px dashed #C9C9C9', textAlign: 'center' }}
-              onClick={() => setDialogOpen(true)}
-            >
-              <h1>Create New {parent ? 'Team' : 'Organization'}</h1>
-              <p>
-                <Add></Add>
-              </p>
-            </Paper>
-          </Grid>
+      ></Grid>
+      <Box sx={{ backgroundColor: 'white' }}>
+        {organizations?.length === 0 ? (
+          <Alert severity="warning">No organizations found.</Alert>
+        ) : (
+          <DataGrid
+            rows={organizations}
+            columns={orgCols}
+            slots={{ toolbar: CustomToolbar }}
+            slotProps={{
+              toolbar: { children: addOrgButton }
+            }}
+          />
         )}
-        {organizations.map((org) => (
-          // TODO: Add functionality to delete organizations
-          <Grid item key={org.id}>
-            <Paper
-              elevation={0}
-              classes={{ root: classes.cardRoot }}
-              onClick={() => {
-                history.push('/organizations/' + org.id);
-              }}
-            >
-              <h1>{org.name}</h1>
-              <p>{org.userRoles ? org.userRoles.length : 0} members</p>
-              {org.tags && org.tags.length > 0 && (
-                <p>Tags: {org.tags.map((tag) => tag.name).join(', ')}</p>
-              )}
-            </Paper>
-          </Grid>
-        ))}
-      </Grid>
+      </Box>
       <OrganizationForm
         onSubmit={onSubmit}
         open={dialogOpen}
@@ -97,26 +119,6 @@ export const OrganizationList: React.FC<{
         type="create"
         parent={parent}
       ></OrganizationForm>
-    </>
+    </Box>
   );
 };
-
-const useStyles = makeStyles((theme) => ({
-  cardRoot: {
-    cursor: 'pointer',
-    boxSizing: 'border-box',
-    border: '2px solid #DCDEE0',
-    height: 150,
-    width: 200,
-    borderRadius: '5px',
-    padding: '1rem',
-    color: '#3D4551',
-    '& h1': {
-      fontSize: '20px',
-      margin: 0
-    },
-    '& p': {
-      fontSize: '14px'
-    }
-  }
-}));

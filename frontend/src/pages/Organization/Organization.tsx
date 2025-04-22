@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Link, Route, useParams, Switch } from 'react-router-dom';
+import * as OrganizationStyles from './style';
+import { Link, useParams } from 'react-router-dom';
 import { useAuthContext } from 'context';
 import {
   Organization as OrganizationType,
@@ -8,19 +9,18 @@ import {
   User,
   Scan,
   ScanSchema,
-  OrganizationTag
+  OrganizationTag,
+  PendingDomain
 } from 'types';
 import { Column } from 'react-table';
-import { Subnav, Table } from 'components';
+import { Table } from 'components';
 // @ts-ignore:next-line
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import {
+  Box,
+  Breadcrumbs,
   Chip,
-  makeStyles,
-  Switch as SwitchInput,
   Button,
-  TextField,
-  Paper,
   Dialog,
   DialogActions,
   DialogContent,
@@ -28,11 +28,20 @@ import {
   DialogTitle,
   FormControlLabel,
   FormLabel,
+  Grid,
+  Link as MuiLink,
+  Paper,
   Radio,
-  RadioGroup
-} from '@material-ui/core';
-import { ChevronRight, ControlPoint } from '@material-ui/icons';
-import { Autocomplete, createFilterOptions } from '@material-ui/lab';
+  RadioGroup,
+  Switch as SwitchInput,
+  Tab,
+  TextField,
+  Typography
+} from '@mui/material';
+import { TabContext, TabList, TabPanel } from '@mui/lab';
+import { ChevronRight, ControlPoint } from '@mui/icons-material';
+import { Autocomplete } from '@mui/material';
+import { createFilterOptions } from '@mui/material/useAutocomplete';
 import { OrganizationList } from 'components/OrganizationList';
 
 interface AutocompleteType extends Partial<OrganizationTag> {
@@ -61,32 +70,40 @@ export const Organization: React.FC = () => {
     email: '',
     role: ''
   });
-  const classes = useStyles();
+  const [tabValue, setTabValue] = React.useState('1');
   const [tagValue, setTagValue] = React.useState<AutocompleteType | null>(null);
   const [inputValue, setInputValue] = React.useState('');
   const [dialog, setDialog] = React.useState<{
     open: boolean;
     type?: 'rootDomains' | 'ipBlocks' | 'tags';
     label?: string;
+    stage?: number;
+    domainVerificationStatusMessage?: string;
   }>({ open: false });
-
+  const [openMemberDialog, setOpenMemberDialog] = React.useState(false);
+  const handleTabChange = (event: React.SyntheticEvent, newValue: string) => {
+    setTabValue(newValue);
+  };
   const dateAccessor = (date?: string) => {
     return !date || new Date(date).getTime() === new Date(0).getTime()
       ? 'None'
       : `${formatDistanceToNow(parseISO(date))} ago`;
   };
 
+  const organizationClasses = OrganizationStyles.organizationClasses;
+  const Root = OrganizationStyles.OrganizationRoot;
+
   const userRoleColumns: Column<Role>[] = [
     {
       Header: 'Name',
-      accessor: ({ user }) => user.fullName,
+      accessor: ({ user }) => user?.fullName,
       width: 200,
       disableFilters: true,
       id: 'name'
     },
     {
       Header: 'Email',
-      accessor: ({ user }) => user.email,
+      accessor: ({ user }) => user?.email,
       width: 150,
       minWidth: 150,
       id: 'email',
@@ -96,7 +113,7 @@ export const Organization: React.FC = () => {
       Header: 'Role',
       accessor: ({ approved, role, user }) => {
         if (approved) {
-          if (user.invitePending) {
+          if (user?.invitePending) {
             return 'Invite pending';
           } else if (role === 'admin') {
             return 'Administrator';
@@ -114,12 +131,12 @@ export const Organization: React.FC = () => {
     {
       Header: () => {
         return (
-          <div style={{ justifyContent: 'flex-center' }}>
-            <Button color="secondary" onClick={() => setDialog({ open: true })}>
+          <Root style={{ justifyContent: 'flex-center' }}>
+            <Button color="secondary" onClick={() => setOpenMemberDialog(true)}>
               <ControlPoint style={{ marginRight: '10px' }}></ControlPoint>
               Add member
             </Button>
-          </div>
+          </Root>
         );
       },
       id: 'action',
@@ -185,7 +202,7 @@ export const Organization: React.FC = () => {
       id: 'action',
       maxWidth: 100,
       Cell: ({ row }: { row: { index: number } }) => {
-        if (!organization) return;
+        if (!organization) return null;
         const enabled = organization.granularScans.find(
           (scan) => scan.id === scans[row.index].id
         );
@@ -376,6 +393,64 @@ export const Organization: React.FC = () => {
     }
   };
 
+  const initiateDomainVerification = async (domain: string) => {
+    try {
+      if (!organization) return;
+      const pendingDomains: PendingDomain[] = await apiPost(
+        `/organizations/${organization?.id}/initiateDomainVerification`,
+        {
+          body: { domain }
+        }
+      );
+      setOrganization({ ...organization, pendingDomains });
+    } catch (e: any) {
+      setFeedbackMessage({
+        message:
+          e.status === 422
+            ? 'Error creating domain'
+            : e.message ?? e.toString(),
+        type: 'error'
+      });
+      console.error(e);
+    }
+  };
+
+  const checkDomainVerification = async (domain: string) => {
+    try {
+      if (!organization) return;
+      const resp: { success: boolean; organization?: OrganizationType } =
+        await apiPost(
+          `/organizations/${organization?.id}/checkDomainVerification`,
+          {
+            body: { domain }
+          }
+        );
+      if (resp.success && resp.organization) {
+        setOrganization(resp.organization);
+        setDialog({ open: false });
+        setFeedbackMessage({
+          message: 'Domain ' + inputValue + ' successfully verified!',
+          type: 'success'
+        });
+      } else {
+        setDialog({
+          ...dialog,
+          domainVerificationStatusMessage:
+            'Record not yet found. Note that DNS records may take up to 72 hours to propagate. You can come back later to check the verification status.'
+        });
+      }
+    } catch (e: any) {
+      setFeedbackMessage({
+        message:
+          e.status === 422
+            ? 'Error verifying domain'
+            : e.message ?? e.toString(),
+        type: 'error'
+      });
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetchOrganization();
   }, [fetchOrganization]);
@@ -430,42 +505,72 @@ export const Organization: React.FC = () => {
     if (!organization) return null;
     const elements: (string | OrganizationTag)[] = organization[props.type];
     return (
-      <div className={classes.headerRow}>
-        <label>{props.label}</label>
-        <span>
-          {elements &&
-            elements.map((value: string | OrganizationTag, index: number) => (
+      <Grid container spacing={1}>
+        <Grid item xs={12} sm={3} lg={2} my={1}>
+          <Typography variant="body2">{props.label}</Typography>
+        </Grid>
+        {elements &&
+          elements.map((value: string | OrganizationTag, index: number) => (
+            <Grid item mb={1} key={index}>
               <Chip
-                className={classes.chip}
-                key={index}
+                color={'primary'}
+                className={organizationClasses.chip}
                 label={typeof value === 'string' ? value : value.name}
                 onDelete={() => {
                   organization[props.type].splice(index, 1);
                   setOrganization({ ...organization });
                 }}
               ></Chip>
-            ))}
-          <Chip
-            label="ADD"
-            variant="outlined"
-            color="secondary"
-            onClick={() => {
-              setDialog({
-                open: true,
-                type: props.type,
-                label: props.label
-              });
-            }}
-          />
-        </span>
-      </div>
+            </Grid>
+          ))}
+        {props.type === 'rootDomains' &&
+          organization.pendingDomains.map((domain, index: number) => (
+            <Grid item mb={1} key={index}>
+              <Chip
+                className={organizationClasses.chip}
+                style={{ backgroundColor: '#C4C4C4' }}
+                label={domain.name + ' (verification pending)'}
+                onDelete={() => {
+                  organization.pendingDomains.splice(index, 1);
+                  setOrganization({ ...organization });
+                }}
+                onClick={() => {
+                  setInputValue(domain.name);
+                  setDialog({
+                    open: true,
+                    type: props.type,
+                    label: props.label,
+                    stage: 1
+                  });
+                }}
+              ></Chip>
+            </Grid>
+          ))}
+        {(props.type === 'rootDomains' || user?.userType === 'globalAdmin') && (
+          <Grid item mb={1}>
+            <Chip
+              label="ADD"
+              variant="outlined"
+              color="secondary"
+              onClick={() => {
+                setDialog({
+                  open: true,
+                  type: props.type,
+                  label: props.label,
+                  stage: 0
+                });
+              }}
+            />
+          </Grid>
+        )}
+      </Grid>
     );
   };
 
   if (!organization) return null;
 
   const views = [
-    <Paper className={classes.settingsWrapper} key={0}>
+    <Paper key={0}>
       <Dialog
         open={dialog.open}
         onClose={() => setDialog({ open: false })}
@@ -516,9 +621,12 @@ export const Organization: React.FC = () => {
                 handleHomeEndKeys
                 options={tags}
                 getOptionLabel={(option) => {
-                  return option.name ?? '';
+                  if (typeof option === 'string') {
+                    return option;
+                  }
+                  return (option as AutocompleteType).name ?? '';
                 }}
-                renderOption={(option) => {
+                renderOption={(props, option) => {
                   if (option.title) return option.title;
                   return option.name ?? '';
                 }}
@@ -529,10 +637,54 @@ export const Organization: React.FC = () => {
                 )}
               />
             </>
-          ) : (
+          ) : dialog.type === 'rootDomains' && dialog.stage === 1 ? (
+            <>
+              <DialogContentText>
+                Add the following TXT record to {inputValue}&apos;s DNS
+                configuration and click Verify.
+              </DialogContentText>
+              <TextField
+                style={{ width: '100%' }}
+                value={
+                  organization.pendingDomains.find(
+                    (domain) => domain.name === inputValue
+                  )?.token
+                }
+                onFocus={(event) => {
+                  event.target.select();
+                }}
+              />
+              {dialog.domainVerificationStatusMessage && (
+                <>
+                  <br></br>
+                  <br></br>
+                  <DialogContentText>
+                    {dialog.domainVerificationStatusMessage}
+                  </DialogContentText>
+                </>
+              )}
+            </>
+          ) : user?.userType === 'globalAdmin' ? (
             <>
               <DialogContentText>
                 Separate multiple entries by commas.
+              </DialogContentText>
+              <TextField
+                autoFocus
+                margin="dense"
+                id="name"
+                inputProps={{ maxLength: 255 }}
+                label={dialog.label && dialog.label.slice(0, -1)}
+                type="text"
+                fullWidth
+                onChange={(e) => setInputValue(e.target.value)}
+              />
+            </>
+          ) : dialog.type === 'rootDomains' && dialog.stage === 0 ? (
+            <>
+              <DialogContentText>
+                In order to add a root domain, you will need to verify ownership
+                of the domain.
               </DialogContentText>
               <TextField
                 autoFocus
@@ -544,6 +696,8 @@ export const Organization: React.FC = () => {
                 onChange={(e) => setInputValue(e.target.value)}
               />
             </>
+          ) : (
+            <></>
           )}
         </DialogContent>
         <DialogActions>
@@ -554,7 +708,20 @@ export const Organization: React.FC = () => {
             variant="contained"
             color="primary"
             onClick={() => {
-              if (dialog.type && dialog.type !== 'tags') {
+              if (
+                dialog.type === 'rootDomains' &&
+                user?.userType !== 'globalAdmin'
+              ) {
+                if (dialog.stage === 0) {
+                  // Start verification process
+                  initiateDomainVerification(inputValue);
+                  setDialog({ ...dialog, stage: 1 });
+                  return;
+                } else {
+                  checkDomainVerification(inputValue);
+                  return;
+                }
+              } else if (dialog.type && dialog.type !== 'tags') {
                 if (inputValue) {
                   // Allow adding multiple values with a comma delimiter
                   organization[dialog.type].push(
@@ -574,61 +741,79 @@ export const Organization: React.FC = () => {
               setTagValue(null);
             }}
           >
-            Add
+            {dialog.type === 'rootDomains' && user?.userType !== 'globalAdmin'
+              ? dialog.stage === 0
+                ? 'Next'
+                : 'Verify'
+              : 'Add'}
           </Button>
         </DialogActions>
       </Dialog>
-      <TextField
-        value={organization.name}
-        disabled
-        variant="filled"
-        InputProps={{
-          className: classes.orgName
-        }}
-      ></TextField>
-      <ListInput label="Root Domains" type="rootDomains"></ListInput>
-      <ListInput label="IP Blocks" type="ipBlocks"></ListInput>
-      {user?.userType === 'globalAdmin' && (
-        <ListInput label="Tags" type="tags"></ListInput>
-      )}
-      <div className={classes.headerRow}>
-        <label>Passive Mode</label>
-        <span>
-          <SwitchInput
-            checked={organization.isPassive}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-              setOrganization({
-                ...organization,
-                isPassive: event.target.checked
-              });
+      <Grid container spacing={1} p={3}>
+        <Grid item xs={12}>
+          <TextField
+            value={organization.name}
+            disabled
+            variant="standard"
+            InputProps={{
+              className: organizationClasses.orgName
             }}
-            color="primary"
-          />
-        </span>
-      </div>
-      <div className={classes.buttons}>
-        <Link to={`/organizations`}>
+          ></TextField>
+        </Grid>
+        <Grid item xs={12}>
+          <ListInput label="Root Domains" type="rootDomains"></ListInput>
+        </Grid>
+        <Grid item xs={12}>
+          <ListInput label="IP Blocks" type="ipBlocks"></ListInput>
+        </Grid>
+        {user?.userType === 'globalAdmin' && (
+          <Grid item xs={12}>
+            <ListInput label="Tags" type="tags"></ListInput>
+          </Grid>
+        )}
+        <Grid item xs={12}>
+          <Grid container spacing={1}>
+            <Grid item xs={12} sm={3} lg={2} my={1}>
+              <Typography variant="body2">Passive Mode</Typography>
+            </Grid>
+            <Grid item ml={-1}>
+              <SwitchInput
+                checked={organization.isPassive}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                  setOrganization({
+                    ...organization,
+                    isPassive: event.target.checked
+                  });
+                }}
+                color="primary"
+              />
+            </Grid>
+          </Grid>
+        </Grid>
+        <Grid item xs={12}>
+          <Link to={`/organizations`}>
+            <Button
+              variant="outlined"
+              style={{ marginRight: '10px', color: '#565C65' }}
+            >
+              Cancel
+            </Button>
+          </Link>
           <Button
-            variant="outlined"
-            style={{ marginRight: '10px', color: '#565C65' }}
+            variant="contained"
+            onClick={updateOrganization}
+            style={{ background: '#565C65', color: 'white' }}
           >
-            Cancel
+            Save
           </Button>
-        </Link>
-        <Button
-          variant="contained"
-          onClick={updateOrganization}
-          style={{ background: '#565C65', color: 'white' }}
-        >
-          Save
-        </Button>
-      </div>
+        </Grid>
+      </Grid>
     </Paper>,
     <React.Fragment key={1}>
       <Table<Role> columns={userRoleColumns} data={userRoles} />
       <Dialog
-        open={dialog.open}
-        onClose={() => setDialog({ open: false })}
+        open={openMemberDialog}
+        onClose={() => setOpenMemberDialog(false)}
         aria-labelledby="form-dialog-title"
         maxWidth="xs"
         fullWidth
@@ -644,6 +829,7 @@ export const Organization: React.FC = () => {
             margin="dense"
             id="firstName"
             name="firstName"
+            inputProps={{ maxLength: 50 }}
             label="First Name"
             type="text"
             fullWidth
@@ -651,7 +837,7 @@ export const Organization: React.FC = () => {
             onChange={onInviteUserTextChange}
             variant="filled"
             InputProps={{
-              className: classes.textField
+              className: organizationClasses.textField
             }}
           />
           <TextField
@@ -659,13 +845,14 @@ export const Organization: React.FC = () => {
             id="lastName"
             name="lastName"
             label="Last Name"
+            inputProps={{ maxLength: 50 }}
             type="text"
             fullWidth
             value={newUserValues.lastName}
             onChange={onInviteUserTextChange}
             variant="filled"
             InputProps={{
-              className: classes.textField
+              className: organizationClasses.textField
             }}
           />
           <TextField
@@ -673,13 +860,14 @@ export const Organization: React.FC = () => {
             id="email"
             name="email"
             label="Email"
+            inputProps={{ maxLength: 100 }}
             type="text"
             fullWidth
             value={newUserValues.email}
             onChange={onInviteUserTextChange}
             variant="filled"
             InputProps={{
-              className: classes.textField
+              className: organizationClasses.textField
             }}
           />
           <br></br>
@@ -704,7 +892,7 @@ export const Organization: React.FC = () => {
           </RadioGroup>
         </DialogContent>
         <DialogActions>
-          <Button variant="outlined" onClick={() => setDialog({ open: false })}>
+          <Button variant="outlined" onClick={() => setOpenMemberDialog(false)}>
             Cancel
           </Button>
           <Button
@@ -712,7 +900,7 @@ export const Organization: React.FC = () => {
             color="primary"
             onClick={async () => {
               onInviteUserSubmit();
-              setDialog({ open: false });
+              setOpenMemberDialog(false);
             }}
           >
             Add
@@ -730,170 +918,39 @@ export const Organization: React.FC = () => {
     </React.Fragment>
   ];
 
-  let navItems = [
-    {
-      title: 'Settings',
-      path: `/organizations/${organizationId}`,
-      exact: true
-    },
-    {
-      title: 'Members',
-      path: `/organizations/${organizationId}/members`
-    }
-  ];
-
-  if (!organization.parent) {
-    navItems = navItems.concat([
-      // { title: 'Teams', path: `/organizations/${organizationId}/teams` },
-      // { title: 'Scans', path: `/organizations/${organizationId}/scans` }
-    ]);
-  }
-
   return (
-    <div>
-      <div className={classes.header}>
-        <h1 className={classes.headerLabel}>
-          <Link to="/organizations">Organizations</Link>
+    <Grid container p={2}>
+      <Grid item xs={12} mb={2}>
+        <Breadcrumbs separator={<ChevronRight />}>
+          <MuiLink href="/organizations" variant="h5">
+            Organizations
+          </MuiLink>
           {organization.parent && (
-            <>
-              <ChevronRight></ChevronRight>
-              <Link to={'/organizations/' + organization.parent.id}>
-                {organization.parent.name}
-              </Link>
-            </>
+            <MuiLink href={'/organizations/' + organization.parent.id}>
+              {organization.parent.name}
+            </MuiLink>
           )}
-          <ChevronRight
-            style={{
-              verticalAlign: 'middle',
-              lineHeight: '100%',
-              fontSize: '26px'
-            }}
-          ></ChevronRight>
-          <span style={{ color: '#07648D' }}>{organization.name}</span>
-        </h1>
-        <Subnav
-          items={navItems}
-          styles={{
-            background: '#F9F9F9'
-          }}
-        ></Subnav>
-      </div>
-      <div className={classes.root}>
-        <Switch>
-          <Route
-            path="/organizations/:organizationId"
-            exact
-            render={() => views[0]}
-          />
-          <Route
-            path="/organizations/:organizationId/members"
-            render={() => views[1]}
-          />
-          <Route
-            path="/organizations/:organizationId/teams"
-            render={() => views[2]}
-          />
-          <Route
-            path="/organizations/:organizationId/scans"
-            render={() => views[3]}
-          />
-        </Switch>
-      </div>
-    </div>
+          <Typography variant="h5" color="primary">
+            {organization.name}
+          </Typography>
+        </Breadcrumbs>
+      </Grid>
+      <Grid xs={12} md={2} xl={3} />
+      <Grid item xs={12} md={8} xl={6}>
+        <TabContext value={tabValue}>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+            <TabList onChange={handleTabChange}>
+              <Tab label="Settings" value="1" />
+              <Tab label="Members" value="2" />
+            </TabList>
+          </Box>
+          <TabPanel value="1">{views[0]}</TabPanel>
+          <TabPanel value="2">{views[1]}</TabPanel>
+        </TabContext>
+      </Grid>
+      <Grid xs={12} md={2} xl={3} />
+    </Grid>
   );
 };
-
-const useStyles = makeStyles((theme) => ({
-  header: {
-    background: '#F9F9F9'
-  },
-  headerLabel: {
-    margin: 0,
-    paddingTop: '1.5rem',
-    paddingBottom: '0.5rem',
-    marginLeft: '15%',
-    color: '#C9C9C9',
-    fontWeight: 500,
-    fontStyle: 'normal',
-    fontSize: '24px',
-    '& a': {
-      textDecoration: 'none',
-      color: '#C9C9C9'
-    },
-    '& svg': {
-      verticalAlign: 'middle',
-      lineHeight: '100%',
-      fontSize: '26px'
-    }
-  },
-  chip: {
-    backgroundColor: '#C4C4C4',
-    color: 'white',
-    marginRight: '10px'
-  },
-  settingsWrapper: {
-    boxSizing: 'border-box',
-    border: '0px',
-    boxShadow: 'none',
-    borderRadius: '0px',
-    padding: '25px',
-    maxWidth: '900px',
-    margin: '0 auto'
-  },
-  buttons: {
-    display: 'flex',
-    justifyContent: 'flex-end'
-  },
-  orgName: {
-    background: '#F5F5F5 !important',
-    paddingBottom: '10px'
-  },
-  textField: {
-    background: '#F5F5F5 !important'
-  },
-  root: {
-    maxWidth: '1400px',
-    margin: '0 auto',
-    '@media screen and (min-width: 480px)': {
-      padding: '1rem 1rem'
-    },
-    '@media screen and (min-width: 640px)': {
-      padding: '1rem 1.5rem'
-    },
-    '@media screen and (min-width: 1024px)': {
-      padding: '1rem 2rem'
-    }
-  },
-  headerRow: {
-    padding: '0.5rem 0',
-    width: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    fontSize: '16px',
-    flexWrap: 'wrap',
-    '& label': {
-      flex: '1 0 100%',
-      fontWeight: 'bolder',
-      display: 'flex',
-      alignItems: 'center',
-      padding: '0.5rem 0',
-      '@media screen and (min-width: 640px)': {
-        flex: '0 0 220px',
-        padding: 0
-      }
-    },
-    '& span': {
-      display: 'block',
-      flex: '1 1 auto',
-      marginLeft: 'calc(1rem + 20px)',
-      '@media screen and (min-width: 640px)': {
-        marginLeft: 'calc(1rem + 20px)'
-      },
-      '@media screen and (min-width: 1024px)': {
-        marginLeft: 0
-      }
-    }
-  }
-}));
 
 export default Organization;

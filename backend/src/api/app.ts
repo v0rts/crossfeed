@@ -5,6 +5,8 @@ import * as cors from 'cors';
 import * as helmet from 'helmet';
 import { handler as healthcheck } from './healthcheck';
 import * as auth from './auth';
+import * as cpes from './cpes';
+import * as cves from './cves';
 import * as domains from './domains';
 import * as search from './search';
 import * as vulnerabilities from './vulnerabilities';
@@ -31,7 +33,7 @@ if (
   setInterval(() => scheduler({}, {} as any, () => null), 30000);
 }
 
-const handlerToExpress = (handler) => async (req, res, next) => {
+const handlerToExpress = (handler) => async (req, res) => {
   const { statusCode, body } = await handler(
     {
       pathParameters: req.params,
@@ -55,14 +57,53 @@ const handlerToExpress = (handler) => async (req, res, next) => {
 
 const app = express();
 
-app.use(cors());
 app.use(express.json({ strict: false }));
-app.use(helmet.hsts({ maxAge: 31536000, preload: true }));
+
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+  })
+);
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: [
+          "'self'",
+          'https://cognito-idp.us-east-1.amazonaws.com',
+          'https://api.staging-cd.crossfeed.cyber.dhs.gov'
+        ],
+        objectSrc: ["'none'"],
+        scriptSrc: [
+          "'self'",
+          'https://api.staging-cd.crossfeed.cyber.dhs.gov'
+          // Add any other allowed script sources here
+        ],
+        frameAncestors: ["'none'"]
+        // Add other directives as needed
+      }
+    },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true
+    }
+  })
+);
+
+app.use((req, res, next) => {
+  res.setHeader('X-XSS-Protection', '0');
+  next();
+});
+
 app.use(cookieParser());
 
 app.get('/', handlerToExpress(healthcheck));
 app.post('/auth/login', handlerToExpress(auth.login));
 app.post('/auth/callback', handlerToExpress(auth.callback));
+app.post('/users/register', handlerToExpress(users.register));
 
 const checkUserLoggedIn = async (req, res, next) => {
   req.requestContext = {
@@ -132,10 +173,10 @@ app.get('/index.php', (req, res) => res.redirect('/matomo/index.php'));
 const matomoProxy = createProxyMiddleware({
   target: process.env.MATOMO_URL,
   headers: { HTTP_X_FORWARDED_URI: '/matomo' },
-  pathRewrite: function (path, req) {
+  pathRewrite: function (path) {
     return path.replace(/^\/matomo/, '');
   },
-  onProxyReq: function (proxyReq, req, res) {
+  onProxyReq: function (proxyReq) {
     // Only pass the MATOMO_SESSID cookie to Matomo.
     if (!proxyReq.getHeader('Cookie')) return;
     const cookies = cookie.parse(proxyReq.getHeader('Cookie'));
@@ -145,7 +186,7 @@ const matomoProxy = createProxyMiddleware({
     );
     proxyReq.setHeader('Cookie', newCookies);
   },
-  onProxyRes: function (proxyRes, req, res) {
+  onProxyRes: function (proxyRes) {
     // Remove transfer-encoding: chunked responses, because API Gateway doesn't
     // support chunked encoding.
     if (proxyRes.headers['transfer-encoding'] === 'chunked') {
@@ -163,7 +204,7 @@ const matomoProxy = createProxyMiddleware({
  */
 const peProxy = createProxyMiddleware({
   target: process.env.PE_API_URL,
-  pathRewrite: function (path, req) {
+  pathRewrite: function (path) {
     return path.replace(/^\/pe/, '');
   }
 });
@@ -227,6 +268,7 @@ app.use(
 const authenticatedNoTermsRoute = express.Router();
 authenticatedNoTermsRoute.use(checkUserLoggedIn);
 authenticatedNoTermsRoute.get('/users/me', handlerToExpress(users.me));
+// authenticatedNoTermsRoute.post('/users/register', handlerToExpress(users.register));
 authenticatedNoTermsRoute.post(
   '/users/me/acceptTerms',
   handlerToExpress(users.acceptTerms)
@@ -247,6 +289,9 @@ authenticatedRoute.delete('/api-keys/:keyId', handlerToExpress(apiKeys.del));
 
 authenticatedRoute.post('/search', handlerToExpress(search.search));
 authenticatedRoute.post('/search/export', handlerToExpress(search.export_));
+authenticatedRoute.get('/cpes/:id', handlerToExpress(cpes.get));
+authenticatedRoute.get('/cves/:id', handlerToExpress(cves.get));
+authenticatedRoute.get('/cves/name/:name', handlerToExpress(cves.getByName));
 authenticatedRoute.post('/domain/search', handlerToExpress(domains.list));
 authenticatedRoute.post('/domain/export', handlerToExpress(domains.export_));
 authenticatedRoute.get('/domain/:domainId', handlerToExpress(domains.get));
@@ -313,10 +358,23 @@ authenticatedRoute.get(
   '/organizations/:organizationId',
   handlerToExpress(organizations.get)
 );
+authenticatedRoute.get(
+  '/organizations/state/:state',
+  handlerToExpress(organizations.getByState)
+);
+authenticatedRoute.get(
+  '/organizations/regionId/:regionId',
+  handlerToExpress(organizations.getByRegionId)
+);
 authenticatedRoute.post(
   '/organizations',
   handlerToExpress(organizations.create)
 );
+authenticatedRoute.post(
+  '/organizations_upsert',
+  handlerToExpress(organizations.upsert_org)
+);
+
 authenticatedRoute.put(
   '/organizations/:organizationId',
   handlerToExpress(organizations.update)
@@ -324,6 +382,10 @@ authenticatedRoute.put(
 authenticatedRoute.delete(
   '/organizations/:organizationId',
   handlerToExpress(organizations.del)
+);
+authenticatedRoute.post(
+  '/v2/organizations/:organizationId/users',
+  handlerToExpress(organizations.addUserV2)
 );
 authenticatedRoute.post(
   '/organizations/:organizationId/roles/:roleId/approve',
@@ -337,10 +399,27 @@ authenticatedRoute.post(
   '/organizations/:organizationId/granularScans/:scanId/update',
   handlerToExpress(organizations.updateScan)
 );
+authenticatedRoute.post(
+  '/organizations/:organizationId/initiateDomainVerification',
+  handlerToExpress(organizations.initiateDomainVerification)
+);
+authenticatedRoute.post(
+  '/organizations/:organizationId/checkDomainVerification',
+  handlerToExpress(organizations.checkDomainVerification)
+);
 authenticatedRoute.post('/stats', handlerToExpress(stats.get));
-authenticatedRoute.get('/users', handlerToExpress(users.list));
 authenticatedRoute.post('/users', handlerToExpress(users.invite));
+authenticatedRoute.get('/users', handlerToExpress(users.list));
 authenticatedRoute.delete('/users/:userId', handlerToExpress(users.del));
+authenticatedRoute.get(
+  '/users/state/:state',
+  handlerToExpress(users.getByState)
+);
+authenticatedRoute.get(
+  '/users/regionId/:regionId',
+  handlerToExpress(users.getByRegionId)
+);
+authenticatedRoute.post('/users/search', handlerToExpress(users.search));
 
 authenticatedRoute.post(
   '/reports/export',
@@ -350,6 +429,35 @@ authenticatedRoute.post(
 authenticatedRoute.post(
   '/reports/list',
   handlerToExpress(reports.list_reports)
+);
+
+//Authenticated Registration Routes
+authenticatedRoute.put(
+  '/users/:userId/register/approve',
+  handlerToExpress(users.registrationApproval)
+);
+
+authenticatedRoute.put(
+  '/users/:userId/register/deny',
+  handlerToExpress(users.registrationDenial)
+);
+
+//************* */
+//  V2 Routes   //
+//************* */
+
+// Users
+authenticatedRoute.put('/v2/users/:userId', handlerToExpress(users.updateV2));
+authenticatedRoute.get('/v2/users', handlerToExpress(users.getAllV2));
+
+// Organizations
+authenticatedRoute.put(
+  '/v2/organizations/:organizationId',
+  handlerToExpress(organizations.updateV2)
+);
+authenticatedRoute.get(
+  '/v2/organizations',
+  handlerToExpress(organizations.getAllV2)
 );
 
 app.use(authenticatedRoute);

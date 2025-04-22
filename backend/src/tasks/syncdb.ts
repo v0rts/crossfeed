@@ -5,16 +5,17 @@ import {
   Domain,
   Organization,
   OrganizationTag,
-  Scan,
   Vulnerability
 } from '../models';
 import ESClient from './es-client';
 import * as Sentencer from 'sentencer';
 import * as services from './sample_data/services.json';
 import * as cpes from './sample_data/cpes.json';
+import * as cves from './sample_data/cves.json';
 import * as vulnerabilities from './sample_data/vulnerabilities.json';
 import * as nouns from './sample_data/nouns.json';
 import * as adjectives from './sample_data/adjectives.json';
+import { saveToDb } from './cve-sync';
 import { sample } from 'lodash';
 import { handler as searchSync } from './search-sync';
 import { In } from 'typeorm';
@@ -24,6 +25,8 @@ const NUM_SAMPLE_ORGS = 10; // Number of sample orgs
 const NUM_SAMPLE_DOMAINS = 10; // Number of sample domains per org
 const PROB_SAMPLE_SERVICES = 0.5; // Higher number means more services per domain
 const PROB_SAMPLE_VULNERABILITIES = 0.5; // Higher number means more vulnerabilities per domain
+const SAMPLE_STATES = ['VA', 'CA', 'CO'];
+const SAMPLE_REGIONIDS = ['1', '2', '3'];
 
 export const handler: Handler = async (event) => {
   const connection = await connectToDatabase(false);
@@ -48,6 +51,7 @@ export const handler: Handler = async (event) => {
 
   if (type === 'populate') {
     console.log('Populating the database with some sample data...');
+    await saveToDb(cves);
     Sentencer.configure({
       nounList: nouns,
       adjectiveList: adjectives,
@@ -71,6 +75,7 @@ export const handler: Handler = async (event) => {
     }
     for (let i = 0; i <= NUM_SAMPLE_ORGS; i++) {
       const organization = await Organization.create({
+        acronym: Math.random().toString(36).slice(2, 7),
         name: Sentencer.make('{{ adjective }} {{ entity }}').replace(
           /\b\w/g,
           (l) => l.toUpperCase()
@@ -78,7 +83,10 @@ export const handler: Handler = async (event) => {
         rootDomains: ['crossfeed.local'],
         ipBlocks: [],
         isPassive: false,
-        tags: [tag]
+        tags: [tag],
+        state: SAMPLE_STATES[Math.floor(Math.random() * SAMPLE_STATES.length)],
+        regionId:
+          SAMPLE_REGIONIDS[Math.floor(Math.random() * SAMPLE_REGIONIDS.length)]
       }).save();
       console.log(organization.name);
       organizationIds.push(organization.id);

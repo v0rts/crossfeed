@@ -1,4 +1,3 @@
-import { mocked } from 'ts-jest/utils';
 import { getLiveWebsites, LiveDomain } from '../helpers/getLiveWebsites';
 import { Domain, Service, connectToDatabase, Organization } from '../../models';
 import { CommandOptions } from '../ecs-client';
@@ -8,7 +7,7 @@ import * as nock from 'nock';
 const axios = require('axios');
 
 jest.mock('../helpers/getLiveWebsites');
-const getLiveWebsitesMock = mocked(getLiveWebsites);
+const getLiveWebsitesMock = getLiveWebsites as jest.Mock;
 
 jest.mock('../helpers/simple-wappalyzer');
 const wappalyzer = require('../helpers/simple-wappalyzer')
@@ -67,9 +66,13 @@ const commandOptions: CommandOptions = {
 
 describe('wappalyzer', () => {
   let testDomain: LiveDomain;
+  let connection;
 
   beforeAll(async () => {
-    await connectToDatabase();
+    connection = await connectToDatabase();
+  });
+  afterAll(async () => {
+    await connection.close();
   });
 
   beforeEach(() => {
@@ -244,7 +247,7 @@ describe('wappalyzer', () => {
     scope.done();
     expect(wappalyzer).toHaveBeenCalledTimes(2);
     expect(logSpy).toHaveBeenLastCalledWith(
-      'Wappalyzer finished for 2 domains'
+      'Wappalyzer finished for organization organizationName on 2 domains'
     );
     const service1 = await Service.findOne(testServices[0].id);
     expect(service1?.wappalyzerResults).toEqual([]);

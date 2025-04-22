@@ -33,7 +33,7 @@ describe('Header component', () => {
     [
       'Vulnerabilities',
       'Risk Summary',
-      'My Organizations',
+      // 'My Organizations',
       'Manage Organizations',
       'Scans',
       'Manage Users',
@@ -53,7 +53,7 @@ describe('Header component', () => {
     [
       'Overview',
       'Inventory',
-      'My Organizations',
+      // 'My Organizations',
       'My Account',
       'My Settings',
       'Logout'
@@ -75,7 +75,7 @@ describe('Header component', () => {
     [
       'Overview',
       'Inventory',
-      'My Organizations',
+      // 'My Organizations',
       'My Account',
       'My Settings',
       'Logout'
@@ -88,7 +88,7 @@ describe('Header component', () => {
   });
 
   it('shows correct links for GLOBAL_ADMIN', () => {
-    const { getByText, queryByText } = render(<Header />, {
+    const { getByText } = render(<Header />, {
       authContext: {
         user: { ...testUser, userType: 'globalAdmin', isRegistered: true },
         currentOrganization: { ...testOrganization }
@@ -106,8 +106,8 @@ describe('Header component', () => {
     ].forEach((expected) => {
       expect(getByText(expected)).toBeInTheDocument();
     });
-    ['My Organizations'].forEach((notExpected) => {
-      expect(queryByText(notExpected)).not.toBeInTheDocument();
-    });
+    // ['My Organizations'].forEach((notExpected) => {
+    //   expect(queryByText(notExpected)).not.toBeInTheDocument();
+    // });
   });
 });

@@ -11,17 +11,25 @@ import {
   getUserMustSign
 } from './userStateUtils';
 import Cookies from 'universal-cookie';
-import { Snackbar } from '@material-ui/core';
-import { Alert, AlertProps } from '@material-ui/lab';
+import { Snackbar } from '@mui/material';
+import { Alert } from '@mui/material';
+import { AlertProps } from '@mui/lab';
 
 export const currentTermsVersion = '1';
 
-export const AuthContextProvider: React.FC = ({ children }) => {
+interface AuthContextProviderProps {
+  children: React.ReactNode;
+}
+
+export const AuthContextProvider: React.FC<AuthContextProviderProps> = ({
+  children
+}) => {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [token, setToken] = usePersistentState<string | null>('token', null);
   const [org, setOrg] = usePersistentState<
     Organization | OrganizationTag | null
   >('organization', null);
+  const [showMap, setShowMap] = usePersistentState<boolean>('showMap', false);
   const [showAllOrganizations, setShowAllOrganizations] =
     usePersistentState<boolean>('showAllOrganizations', false);
   const [feedbackMessage, setFeedbackMessage] = useState<{
@@ -78,17 +86,21 @@ export const AuthContextProvider: React.FC = ({ children }) => {
   );
 
   const refreshUser = useCallback(async () => {
-    if (!token && process.env.REACT_APP_USE_COGNITO) {
-      const session = await Auth.currentSession();
-      const { token } = await apiPost<{ token: string; user: User }>(
-        '/auth/callback',
-        {
-          body: {
-            token: session.getIdToken().getJwtToken()
+    try {
+      if (!token && process.env.REACT_APP_USE_COGNITO) {
+        const session = await Auth.currentSession();
+        const { token } = await apiPost<{ token: string; user: User }>(
+          '/auth/callback',
+          {
+            body: {
+              token: session.getIdToken().getJwtToken()
+            }
           }
-        }
-      );
-      setToken(token);
+        );
+        setToken(token);
+      }
+    } catch (error) {
+      console.log(error);
     }
   }, [apiPost, setToken, token]);
 
@@ -129,6 +141,8 @@ export const AuthContextProvider: React.FC = ({ children }) => {
         setUser: setProfile,
         refreshUser,
         setOrganization: setOrg,
+        showMaps: showMap,
+        setShowMaps: setShowMap,
         currentOrganization: extendedOrg,
         showAllOrganizations: showAllOrganizations,
         setShowAllOrganizations: setShowAllOrganizations,
@@ -139,6 +153,7 @@ export const AuthContextProvider: React.FC = ({ children }) => {
         touVersion,
         userMustSign,
         setFeedbackMessage,
+        userType: '',
         ...api
       }}
     >

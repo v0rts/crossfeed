@@ -30,10 +30,13 @@ Here is a list of database models used by Crossfeed:
 | SavedSearch     | A SavedSearch is a search that a User has saved.                                             |
 | Scan            | A Scan is a scheduled data collection job.                                                   |
 | ScanTask        | A ScanTask represents a specific run, at a certain time and date, of a Scan.                 |
+| Cves            | A Cve represents our records of all cves and foreign keys to their cpes                      |
+| Cpes            | A Cpe is a product giving detail about it.                                                   |
 
 ### Entity-relationship Diagram of the Database
 
 <img src='img/entity-relationship diagram.png' alt='Entity-relationship Diagram of the relational database' />
+* Generated with <a href="https://dbeaver.com/2022/06/30/two-ways-to-use-erd-in-dbeaver/">DBeaver</a>
 
 ### Syncing the database
 

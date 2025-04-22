@@ -1,19 +1,43 @@
 import oldClasses from './Organizations.module.scss';
+import { styled } from '@mui/material/styles';
 import React, { useCallback, useState } from 'react';
 import { ImportExport } from 'components';
 import { Organization } from 'types';
 import { useAuthContext } from 'context';
-import { makeStyles } from '@material-ui/core';
 import { OrganizationList } from 'components/OrganizationList';
+import { Typography } from '@mui/material';
+
+const PREFIX = 'Organizations';
+
+const classes = {
+  header: `${PREFIX}-header`,
+  headerLabel: `${PREFIX}-headerLabel`
+};
+
+const Root = styled('div')(({ theme }) => ({
+  [`& .${classes.header}`]: {
+    background: '#F9F9F9'
+  },
+
+  [`& .${classes.headerLabel}`]: {
+    margin: 0,
+    paddingTop: '1.5rem',
+    paddingBottom: '1rem',
+    marginLeft: '15%',
+    fontWeight: 500,
+    fontStyle: 'normal',
+    fontSize: '24px',
+    color: '#07648D'
+  }
+}));
 
 export const Organizations: React.FC = () => {
   const { user, apiGet, apiPost } = useAuthContext();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const classes = useStyles();
 
   const fetchOrganizations = useCallback(async () => {
     try {
-      const rows = await apiGet<Organization[]>('/organizations/');
+      const rows = await apiGet<Organization[]>('/v2/organizations/');
       setOrganizations(rows);
     } catch (e) {
       console.error(e);
@@ -25,11 +49,11 @@ export const Organizations: React.FC = () => {
   }, [apiGet, fetchOrganizations]);
 
   return (
-    <div>
-      <div className={classes.header}>
-        <h1 className={classes.headerLabel}>Organizations</h1>
-      </div>
+    <Root>
       <div className={oldClasses.root}>
+        <Typography variant="h4" mt={5} mb={3} fontWeight="medium">
+          Organizations
+        </Typography>
         <OrganizationList></OrganizationList>
         {user?.userType === 'globalAdmin' && (
           <>
@@ -37,37 +61,49 @@ export const Organizations: React.FC = () => {
               name="organizations"
               fieldsToExport={[
                 'name',
+                'acronym',
                 'rootDomains',
                 'ipBlocks',
                 'isPassive',
-                'tags'
+                'tags',
+                'country',
+                'state',
+                'stateFips',
+                'stateName',
+                'county',
+                'countyFips'
               ]}
               onImport={async (results) => {
                 // TODO: use a batch call here instead.
                 const createdOrganizations = [];
                 for (const result of results) {
-                  createdOrganizations.push(
-                    await apiPost('/organizations/', {
-                      body: {
-                        ...result,
-                        // These fields are initially parsed as strings, so they need
-                        // to be converted to arrays.
-                        ipBlocks: (
-                          (result.ipBlocks as unknown as string) || ''
-                        ).split(','),
-                        rootDomains: (
-                          (result.rootDomains as unknown as string) || ''
-                        ).split(','),
-                        tags: ((result.tags as unknown as string) || '')
-                          .split(',')
-                          .map((tag) => ({
-                            name: tag
-                          }))
-                      }
-                    })
-                  );
+                  try {
+                    createdOrganizations.push(
+                      await apiPost('/organizations_upsert/', {
+                        body: {
+                          ...result,
+                          // These fields are initially parsed as strings, so they need
+                          // to be converted to arrays.
+                          ipBlocks: (
+                            (result.ipBlocks as unknown as string) || ''
+                          ).split(','),
+                          rootDomains: (
+                            (result.rootDomains as unknown as string) || ''
+                          ).split(','),
+                          tags: ((result.tags as unknown as string) || '')
+                            .split(',')
+                            .map((tag) => ({
+                              name: tag
+                            }))
+                        }
+                      })
+                    );
+                  } catch (e: any) {
+                    console.error('Error uploading Entry: ' + e);
+                  }
                 }
                 setOrganizations(organizations.concat(...createdOrganizations));
+                window.location.reload();
               }}
               getDataToExport={() =>
                 organizations.map(
@@ -75,31 +111,16 @@ export const Organizations: React.FC = () => {
                     ({
                       ...org,
                       tags: org.tags.map((tag) => tag.name)
-                    } as any)
+                    }) as any
                 )
               }
             />
           </>
         )}
       </div>
-    </div>
+      <br />
+    </Root>
   );
 };
-
-const useStyles = makeStyles((theme) => ({
-  header: {
-    background: '#F9F9F9'
-  },
-  headerLabel: {
-    margin: 0,
-    paddingTop: '1.5rem',
-    paddingBottom: '1rem',
-    marginLeft: '15%',
-    fontWeight: 500,
-    fontStyle: 'normal',
-    fontSize: '24px',
-    color: '#07648D'
-  }
-}));
 
 export default Organizations;

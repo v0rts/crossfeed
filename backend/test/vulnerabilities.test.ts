@@ -14,8 +14,12 @@ jest.mock('../src/tasks/s3-client');
 const saveCSV = require('../src/tasks/s3-client').saveCSV as jest.Mock;
 
 describe('vulnerabilities', () => {
+  let connection;
   beforeAll(async () => {
-    await connectToDatabase();
+    connection = await connectToDatabase();
+  });
+  afterAll(async () => {
+    await connection.close();
   });
   describe('export', () => {
     it('export by org user should only return vulnerabilities from that org', async () => {
@@ -368,7 +372,7 @@ describe('vulnerabilities', () => {
       expect(response.body.count).toEqual(2);
       expect(response.body.result.length).toEqual(2);
     });
-    it.only('list by org user with groupBy set should group results', async () => {
+    it('list by org user with groupBy set should group results', async () => {
       const organization = await Organization.create({
         name: 'test-' + Math.random(),
         rootDomains: ['test-' + Math.random()],

@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { classes, Root } from './Styling/dashboardStyle';
 import { DomainDetails, Subnav } from 'components';
 import { ResultCard } from './ResultCard';
 import {
-  makeStyles,
   Paper,
   FormControl,
   Select,
@@ -13,8 +13,8 @@ import {
   FormGroup,
   TextareaAutosize,
   ButtonGroup
-} from '@material-ui/core';
-import { Pagination } from '@material-ui/lab';
+} from '@mui/material';
+import { Pagination } from '@mui/material';
 import { withSearch } from '@elastic/react-search-ui';
 import { FilterDrawer } from './FilterDrawer';
 import { ContextType } from '../../context/SearchProvider';
@@ -60,7 +60,7 @@ export const DashboardUI: React.FC<ContextType & { location: any }> = (
     searchTerm,
     noResults
   } = props;
-  const classes = useStyles();
+
   const [selectedDomain, setSelectedDomain] = useState('');
   const [resultsScrolled, setResultsScrolled] = useState(false);
   const {
@@ -160,7 +160,7 @@ export const DashboardUI: React.FC<ContextType & { location: any }> = (
   };
 
   return (
-    <div className={classes.root}>
+    <Root className={classes.root}>
       <FilterDrawer
         addFilter={addFilter}
         removeFilter={removeFilter}
@@ -178,9 +178,8 @@ export const DashboardUI: React.FC<ContextType & { location: any }> = (
           styles={{
             paddingLeft: '0%'
           }}
-        >
-          <FilterTags filters={filters} removeFilter={removeFilter} />
-        </Subnav>
+        />
+        <FilterTags filters={filters} removeFilter={removeFilter} />
         <SortBar
           sortField={sortField}
           sortDirection={sortDirection}
@@ -326,7 +325,7 @@ export const DashboardUI: React.FC<ContextType & { location: any }> = (
                 id="description"
                 name="description"
                 style={{ padding: 10 }}
-                rowsMin={2}
+                minRows={2}
                 value={savedSearchValues.vulnerabilityTemplate.description}
                 onChange={onVulnerabilityTemplateChange}
               />
@@ -395,7 +394,7 @@ export const DashboardUI: React.FC<ContextType & { location: any }> = (
           </ButtonGroup>
         </ModalFooter>
       </Modal>
-    </div>
+    </Root>
   );
 };
 
@@ -444,85 +443,3 @@ export const Dashboard = withSearch(
     noResults
   })
 )(DashboardUI);
-
-const useStyles = makeStyles(() => ({
-  tableRoot: {
-    marginTop: '0'
-  },
-  root: {
-    position: 'relative',
-    flex: '1',
-    width: '100%',
-    display: 'flex',
-    flexFlow: 'row nowrap',
-    alignItems: 'stretch',
-    margin: '0',
-    overflowY: 'hidden'
-  },
-  contentWrapper: {
-    position: 'relative',
-    flex: '1 1 auto',
-    height: '100%',
-    display: 'flex',
-    flexFlow: 'column nowrap',
-    overflowY: 'hidden'
-  },
-  status: {
-    display: 'flex',
-    margin: '1rem 0 1rem 1rem',
-    fontSize: '1.2rem',
-    justifyContent: 'flex-start',
-    alignItems: 'center'
-  },
-  content: {
-    display: 'flex',
-    flexFlow: 'row nowrap',
-    alignItems: 'stretch',
-    flex: '1',
-    overflowY: 'hidden'
-  },
-  panel: {
-    position: 'relative',
-    height: '100%',
-    overflowY: 'auto',
-    padding: '0 1rem 2rem 1rem',
-    flex: '0 0 50%'
-  },
-  pagination: {
-    height: 'auto',
-    flex: 0,
-    display: 'flex',
-    flexFlow: 'row nowrap',
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    boxShadow: '0px -1px 2px rgba(0, 0, 0, 0.15)',
-    padding: '1rem 2rem',
-    '& > span': {
-      marginRight: '2rem'
-    },
-    '& *:focus': {
-      outline: 'none !important'
-    },
-    borderRadius: 0,
-    zIndex: 9
-  },
-  exportButton: {
-    justifyContent: 'flex-end',
-    marginLeft: 'auto'
-  },
-  pageSize: {
-    '& > p': {
-      margin: '0 1rem 0 2rem'
-    },
-    display: 'flex',
-    flexFlow: 'row nowrap',
-    alignItems: 'center'
-  },
-  addButton: {
-    outline: 'none',
-    border: 'none',
-    color: '#71767A',
-    background: 'none',
-    cursor: 'pointer'
-  }
-}));

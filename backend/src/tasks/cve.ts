@@ -10,14 +10,7 @@ import { plainToClass } from 'class-transformer';
 import { CommandOptions } from './ecs-client';
 import * as buffer from 'buffer';
 import saveVulnerabilitiesToDb from './helpers/saveVulnerabilitiesToDb';
-import {
-  LessThan,
-  MoreThan,
-  FindOperator,
-  In,
-  MoreThanOrEqual,
-  Not
-} from 'typeorm';
+import { LessThan, MoreThan, In, MoreThanOrEqual, Not } from 'typeorm';
 import * as fs from 'fs';
 import * as zlib from 'zlib';
 import axios, { AxiosResponse } from 'axios';
@@ -331,9 +324,8 @@ const populateVulnerabilitiesFromNVD = async () => {
 
 // Populate CVE details from the CISA Known Exploited Vulnerabilities (KEV) database.
 const populateVulnerabilitiesFromKEV = async () => {
-  const response: AxiosResponse<CISACatalogOfKnownExploitedVulnerabilities> = await axios.get(
-    KEV_URL
-  );
+  const response: AxiosResponse<CISACatalogOfKnownExploitedVulnerabilities> =
+    await axios.get(KEV_URL);
   const { vulnerabilities: kevVulns } = response.data;
   for (const kevVuln of kevVulns) {
     const { affected = 0 } = await Vulnerability.update(

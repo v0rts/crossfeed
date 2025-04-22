@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
+import { classes, Root } from './Styling/filterTagsStyle';
 import { ContextType } from '../../context/SearchProvider';
-import { Chip, makeStyles } from '@material-ui/core';
+import { Chip } from '@mui/material';
 
 interface Props {
   filters: ContextType['filters'];
@@ -17,7 +18,6 @@ type FlatFilters = {
 
 export const FilterTags: React.FC<Props> = (props) => {
   const { filters, removeFilter } = props;
-  const classes = useStyles();
 
   const filtersByColumn: FlatFilters = useMemo(
     () =>
@@ -36,7 +36,7 @@ export const FilterTags: React.FC<Props> = (props) => {
   );
 
   return (
-    <div>
+    <Root>
       {filtersByColumn.map((filter, idx) => (
         <Chip
           key={idx}
@@ -54,12 +54,6 @@ export const FilterTags: React.FC<Props> = (props) => {
           }}
         />
       ))}
-    </div>
+    </Root>
   );
 };
-
-const useStyles = makeStyles((theme) => ({
-  chip: {
-    margin: '0 0.5rem'
-  }
-}));

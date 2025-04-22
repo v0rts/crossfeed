@@ -1,8 +1,15 @@
 import React from 'react';
 import {
   createTheme,
-  MuiThemeProvider as ThemeProvider
-} from '@material-ui/core';
+  ThemeProvider,
+  Theme,
+  StyledEngineProvider
+} from '@mui/material/styles';
+
+declare module '@mui/material/styles' {
+  // eslint-disable-next-line @typescript-eslint/no-empty-interface
+  interface DefaultTheme extends Theme {}
+}
 
 const theme = createTheme({
   palette: {
@@ -27,6 +34,15 @@ const theme = createTheme({
   }
 });
 
-export const CFThemeProvider: React.FC = ({ children }) => {
-  return <ThemeProvider theme={theme}>{children}</ThemeProvider>;
+interface CFThemeProviderProps {
+  children: React.ReactNode;
+}
+export const CFThemeProvider: React.FC<CFThemeProviderProps> = ({
+  children
+}) => {
+  return (
+    <StyledEngineProvider injectFirst>
+      <ThemeProvider theme={theme}>{children}</ThemeProvider>
+    </StyledEngineProvider>
+  );
 };

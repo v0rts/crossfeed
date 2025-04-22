@@ -56,14 +56,14 @@ class S3Client {
     }
   }
 
-  async exportReport(Key: string) {
+  async exportReport(reportName: string, orgId: string) {
     try {
+      const Key = `${orgId}/${reportName}`;
       const url = await this.s3.getSignedUrlPromise('getObject', {
         Bucket: process.env.REPORTS_BUCKET_NAME!,
         Key,
         Expires: 60 * 5 // 5 minutes
       });
-
       // Do this so exports are accessible when running locally.
       if (this.isLocal) {
         return url.replace('minio:9000', 'localhost:9000');
@@ -74,6 +74,7 @@ class S3Client {
       throw e;
     }
   }
+
   async listReports(orgId: string) {
     try {
       const params = {
@@ -88,6 +89,27 @@ class S3Client {
         })
         .promise();
       return data.Contents;
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  }
+
+  async getEmailAsset(fileName: string) {
+    try {
+      const params = {
+        Bucket: process.env.EMAIL_BUCKET_NAME!,
+        Key: fileName
+      };
+
+      const data = await this.s3
+        .getObject(params, function (err, data) {
+          if (err) throw err;
+        })
+        .promise();
+      if (data && data.Body) {
+        return data.Body.toString('utf-8');
+      }
     } catch (e) {
       console.error(e);
       throw e;

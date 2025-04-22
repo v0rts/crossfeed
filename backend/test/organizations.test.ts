@@ -11,10 +11,15 @@ import {
   OrganizationTag,
   UserType
 } from '../src/models';
+const dns = require('dns');
 
 describe('organizations', () => {
+  let connection;
   beforeAll(async () => {
-    await connectToDatabase();
+    connection = await connectToDatabase();
+  });
+  afterAll(async () => {
+    await connection.close();
   });
   describe('create', () => {
     it('create by globalAdmin should succeed', async () => {
@@ -25,6 +30,7 @@ describe('organizations', () => {
         userType: UserType.GLOBAL_ADMIN
       }).save();
       const name = 'test-' + Math.random();
+      const acronym = Math.random().toString(36).slice(2, 7);
       const response = await request(app)
         .post('/organizations/')
         .set(
@@ -36,6 +42,7 @@ describe('organizations', () => {
         )
         .send({
           ipBlocks: [],
+          acronym: acronym,
           name,
           rootDomains: ['cisa.gov'],
           isPassive: false,
@@ -46,7 +53,7 @@ describe('organizations', () => {
       expect(response.body.name).toEqual(name);
       expect(response.body.tags[0].name).toEqual('test');
     });
-    it("can't add organization with the same name", async () => {
+    it("can't add organization with the same acronym", async () => {
       const user = await User.create({
         firstName: '',
         lastName: '',
@@ -54,6 +61,7 @@ describe('organizations', () => {
         userType: UserType.GLOBAL_ADMIN
       }).save();
       const name = 'test-' + Math.random();
+      const acronym = Math.random().toString(36).slice(2, 7);
       await request(app)
         .post('/organizations/')
         .set(
@@ -66,6 +74,7 @@ describe('organizations', () => {
         .send({
           ipBlocks: [],
           name,
+          acronym: acronym,
           rootDomains: ['cisa.gov'],
           isPassive: false,
           tags: []
@@ -83,6 +92,7 @@ describe('organizations', () => {
         .send({
           ipBlocks: [],
           name,
+          acronym: acronym,
           rootDomains: ['cisa.gov'],
           isPassive: false,
           tags: []
@@ -113,12 +123,14 @@ describe('organizations', () => {
   describe('update', () => {
     it('update by globalAdmin should succeed', async () => {
       const organization = await Organization.create({
+        acronym: Math.random().toString(36).slice(2, 7),
         name: 'test-' + Math.random(),
         rootDomains: ['test-' + Math.random()],
         ipBlocks: [],
         isPassive: false
       }).save();
       const name = 'test-' + Math.random();
+      const acronym = Math.random().toString(36).slice(2, 7);
       const rootDomains = ['test-' + Math.random()];
       const ipBlocks = ['1.1.1.1'];
       const isPassive = true;
@@ -133,6 +145,7 @@ describe('organizations', () => {
         )
         .send({
           name,
+          acronym,
           rootDomains,
           ipBlocks,
           isPassive,
@@ -148,14 +161,18 @@ describe('organizations', () => {
     it('update by org admin should update everything but rootDomains and ipBlocks', async () => {
       const organization = await Organization.create({
         name: 'test-' + Math.random(),
+        acronym: Math.random().toString(36).slice(2, 7),
         rootDomains: ['test-' + Math.random()],
+        pendingDomains: [{ name: 'test-' + Math.random(), token: '1234' }],
         ipBlocks: [],
         isPassive: false
       }).save();
       const name = 'test-' + Math.random();
+      const acronym = Math.random().toString(36).slice(2, 7);
       const rootDomains = ['test-' + Math.random()];
       const ipBlocks = ['1.1.1.1'];
       const isPassive = true;
+      const pendingDomains = [{ name: 'test-' + Math.random(), token: '1234' }];
       const response = await request(app)
         .put(`/organizations/${organization.id}`)
         .set(
@@ -166,13 +183,16 @@ describe('organizations', () => {
         )
         .send({
           name,
+          acronym,
           rootDomains,
           ipBlocks,
-          isPassive
+          isPassive,
+          pendingDomains
         })
         .expect(200);
       expect(response.body.name).toEqual(name);
       expect(response.body.rootDomains).toEqual(organization.rootDomains);
+      expect(response.body.pendingDomains).toEqual([]); // Pending domains should support removing, but not adding, domains
       expect(response.body.ipBlocks).toEqual(organization.ipBlocks);
       expect(response.body.isPassive).toEqual(isPassive);
     });
@@ -833,6 +853,185 @@ describe('organizations', () => {
         )
         .expect(200);
       expect(response.body).toHaveLength(0);
+    });
+  });
+  describe('initiateDomainVerification', () => {
+    it('initiateDomainVerification by org user should fail', async () => {
+      const organization = await Organization.create({
+        name: 'test-' + Math.random(),
+        rootDomains: ['test-' + Math.random()],
+        ipBlocks: [],
+        isPassive: false
+      }).save();
+      const response = await request(app)
+        .post(`/organizations/${organization.id}/initiateDomainVerification`)
+        .set(
+          'Authorization',
+          createUserToken({
+            roles: [{ org: organization.id, role: 'user' }]
+          })
+        )
+        .expect(403);
+      expect(response.body).toEqual({});
+    });
+    it('initiateDomainVerification by org admin should add pending domain', async () => {
+      const organization = await Organization.create({
+        name: 'test-' + Math.random(),
+        rootDomains: ['test-' + Math.random()],
+        ipBlocks: [],
+        isPassive: false
+      }).save();
+      const response = await request(app)
+        .post(`/organizations/${organization.id}/initiateDomainVerification`)
+        .set(
+          'Authorization',
+          createUserToken({
+            roles: [{ org: organization.id, role: 'admin' }]
+          })
+        )
+        .send({
+          domain: 'example.com'
+        })
+        .expect(200);
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0].name).toEqual('example.com');
+    });
+    it('initiateDomainVerification for existing root domain should fail', async () => {
+      const organization = await Organization.create({
+        name: 'test-' + Math.random(),
+        rootDomains: ['test-' + Math.random()],
+        ipBlocks: [],
+        isPassive: false
+      }).save();
+      const response = await request(app)
+        .post(`/organizations/${organization.id}/initiateDomainVerification`)
+        .set(
+          'Authorization',
+          createUserToken({
+            roles: [{ org: organization.id, role: 'admin' }]
+          })
+        )
+        .send({
+          domain: organization.rootDomains[0]
+        })
+        .expect(422);
+    });
+    it('initiateDomainVerification for existing pending domain should return same token', async () => {
+      const organization = await Organization.create({
+        name: 'test-' + Math.random(),
+        rootDomains: ['test-' + Math.random()],
+        pendingDomains: [
+          { name: 'test' + Math.random(), token: 'test' + Math.random() }
+        ],
+        ipBlocks: [],
+        isPassive: false
+      }).save();
+      const response = await request(app)
+        .post(`/organizations/${organization.id}/initiateDomainVerification`)
+        .set(
+          'Authorization',
+          createUserToken({
+            roles: [{ org: organization.id, role: 'admin' }]
+          })
+        )
+        .send({
+          domain: organization.pendingDomains[0].name
+        })
+        .expect(200);
+      expect(response.body).toHaveLength(1);
+      expect(response.body).toEqual(organization.pendingDomains);
+    });
+  });
+  describe('checkDomainVerification', () => {
+    it('checkDomainVerification by org user should fail', async () => {
+      const organization = await Organization.create({
+        name: 'test-' + Math.random(),
+        rootDomains: ['test-' + Math.random()],
+        ipBlocks: [],
+        isPassive: false
+      }).save();
+      const response = await request(app)
+        .post(`/organizations/${organization.id}/checkDomainVerification`)
+        .set(
+          'Authorization',
+          createUserToken({
+            roles: [{ org: organization.id, role: 'user' }]
+          })
+        )
+        .expect(403);
+      expect(response.body).toEqual({});
+    });
+    it('checkDomainVerification by org admin for domain that has DNS record created should succeed', async () => {
+      const organization = await Organization.create({
+        name: 'test-' + Math.random(),
+        rootDomains: ['test-' + Math.random()],
+        ipBlocks: [],
+        isPassive: false
+      }).save();
+      const response1 = await request(app)
+        .post(`/organizations/${organization.id}/initiateDomainVerification`)
+        .set(
+          'Authorization',
+          createUserToken({
+            roles: [{ org: organization.id, role: 'admin' }]
+          })
+        )
+        .send({
+          domain: 'example.com'
+        })
+        .expect(200);
+      dns.promises.resolveTxt = jest.fn(() => [
+        ['test'],
+        [response1.body[0].token]
+      ]);
+      const response2 = await request(app)
+        .post(`/organizations/${organization.id}/checkDomainVerification`)
+        .set(
+          'Authorization',
+          createUserToken({
+            roles: [{ org: organization.id, role: 'admin' }]
+          })
+        )
+        .send({
+          domain: 'example.com'
+        })
+        .expect(200);
+      expect(response2.body.success).toEqual(true);
+      expect(response2.body.organization.rootDomains).toContain('example.com');
+    });
+    it('checkDomainVerification by org admin for domain that does not have DNS record created should fail', async () => {
+      const organization = await Organization.create({
+        name: 'test-' + Math.random(),
+        rootDomains: ['test-' + Math.random()],
+        ipBlocks: [],
+        isPassive: false
+      }).save();
+      const response1 = await request(app)
+        .post(`/organizations/${organization.id}/initiateDomainVerification`)
+        .set(
+          'Authorization',
+          createUserToken({
+            roles: [{ org: organization.id, role: 'admin' }]
+          })
+        )
+        .send({
+          domain: 'example.com'
+        })
+        .expect(200);
+      dns.promises.resolveTxt = jest.fn(() => [['test']]);
+      const response2 = await request(app)
+        .post(`/organizations/${organization.id}/checkDomainVerification`)
+        .set(
+          'Authorization',
+          createUserToken({
+            roles: [{ org: organization.id, role: 'admin' }]
+          })
+        )
+        .send({
+          domain: 'example.com'
+        })
+        .expect(200);
+      expect(response2.body.success).toEqual(false);
     });
   });
 });

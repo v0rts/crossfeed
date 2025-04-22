@@ -15,12 +15,16 @@ $theme-show-notifications: false;
 @import '~uswds/scss/packages/usa-modal';
 @import '~uswds/scss/packages/form-controls';
 
-@import "@aws-amplify/ui-react/styles.css";
+@import '@aws-amplify/ui-react/styles.css';
 
 html,
 body {
   box-sizing: border-box;
   background-color: color('base-lightest');
+}
+
+body > iframe {
+  display: none;
 }
 
 .cisa-crossfeed-loading {
@@ -89,5 +93,97 @@ form[data-amplify-authenticator-setup-totp] {
   div[data-amplify-copy] {
     display: none;
   }
+
+}
+.alert_box {
+  margin-top: 25px;
+}
+.platform_notice {
+  margin: auto;
+  text-align: center;
+  padding-top: 10px;
+  font-weight: bold;
+  font-size: 20px;
+}
+.notification_header {
+  position: relative; 
+  padding-left: 10px;
+  padding-top: 10px;
+  padding-bottom: 20px;
+  transition: top .2s;
+  background-color: white;
+
+}
+.temp_notification{
+  position: relative; 
+  padding-left: 10px;
+  padding-top: 10px;
+  padding-bottom: 20px;
+  transition: top .2s;
+  background-color: white;
 }
 
+.notification_box {
+  border-width: 3px;
+  border-style: solid;
+  border-color: hsl(190, 95%, 30%);
+  margin-top: 15px;
+  margin-left: 100px;
+  margin-bottom: 25px;
+  margin-right: 100px;
+}
+.warning_header {
+  margin:auto;
+  width: 50%;
+  text-align: center;
+  padding-top: 10px;
+  color: hsl(190, 95%, 30%);
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.warning_notification  {
+  position: relative; 
+  padding-left: 10px;
+  //padding-top: 10px;
+  padding-bottom: 20px;
+  transition: top .2s;
+ 
+}
+.warning_logo{
+  margin:auto;
+  width: 50%;
+  text-align: center;
+}
+
+.banner_box {
+  border-width: 3px;
+  border-style: solid;
+  border-color: hsl(190, 95%, 30%);
+}
+
+.banner_header {
+  padding-left: 185px;
+  padding-top: 10px;
+  transition: top .2s;
+  background-color: white;
+  font-weight: bold;
+}
+.onClose {
+  margin-left: 15px;
+  color: white;
+  font-weight: bold;
+  float: right;
+  font-size: 22px;
+  line-height: 20px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.banner_login {
+  position: relative; 
+  padding-left: 10px;
+ // padding-top: 10px;
+ // padding-bottom: 20px;
+  transition: top .2s;
+  background-color: white;
+}

@@ -1,4 +1,4 @@
-import { login as login_, callback as callback_ } from './login-gov';
+import loginGov from './login-gov';
 import {
   User,
   connectToDatabase,
@@ -47,9 +47,10 @@ interface UserInfo {
 const client = jwksClient({
   jwksUri: `https://cognito-idp.us-east-1.amazonaws.com/${process.env.REACT_APP_USER_POOL_ID}/.well-known/jwks.json`
 });
+
 function getKey(header, callback) {
   client.getSigningKey(header.kid, function (err, key) {
-    const signingKey = key.getPublicKey();
+    const signingKey = key?.getPublicKey();
     callback(null, signingKey);
   });
 }
@@ -64,7 +65,7 @@ function getKey(header, callback) {
  *    - Auth
  */
 export const login = async (event, context) => {
-  const { url, state, nonce } = await login_();
+  const { url, state, nonce } = await loginGov.login();
   return {
     statusCode: 200,
     body: JSON.stringify({
@@ -111,10 +112,9 @@ export const callback = async (event, context) => {
         )
       );
     } else {
-      userInfo = (await callback_(JSON.parse(event.body))) as UserInfo;
+      userInfo = (await loginGov.callback(JSON.parse(event.body))) as UserInfo;
     }
   } catch (e) {
-    console.error(e);
     return {
       statusCode: 500,
       body: ''
@@ -173,10 +173,7 @@ export const callback = async (event, context) => {
   }
 
   const token = jwt.sign(userTokenBody(user), process.env.JWT_SECRET!, {
-    expiresIn: '1 days',
-    header: {
-      typ: 'JWT'
-    }
+    expiresIn: '1 days'
   });
 
   return {
@@ -231,9 +228,15 @@ export const authorize = async (event) => {
     if (!user) throw Error('User does not exist');
     return userTokenBody(user);
   } catch (e) {
-    console.error(e);
-    const parsed = { id: 'cisa:crossfeed:anonymous' };
-    return parsed;
+    if (e.name === 'JsonWebTokenError') {
+      // Handle this error without logging or displaying the error message
+      const parsed = { id: 'cisa:crossfeed:anonymous' };
+      return parsed;
+    } else {
+      console.error(e);
+      const parsed = { id: 'cisa:crossfeed:anonymous' };
+      return parsed;
+    }
   }
 };
 
@@ -249,6 +252,15 @@ export const isGlobalWriteAdmin = (event: APIGatewayProxyEvent) => {
 export const isGlobalViewAdmin = (event: APIGatewayProxyEvent) => {
   return event.requestContext.authorizer &&
     (event.requestContext.authorizer.userType === UserType.GLOBAL_VIEW ||
+      event.requestContext.authorizer.userType === UserType.GLOBAL_ADMIN)
+    ? true
+    : false;
+};
+
+/** Check if a user has regionalAdmin view permissions */
+export const isRegionalAdmin = (event: APIGatewayProxyEvent) => {
+  return event.requestContext.authorizer &&
+    (event.requestContext.authorizer.userType === UserType.REGIONAL_ADMIN ||
       event.requestContext.authorizer.userType === UserType.GLOBAL_ADMIN)
     ? true
     : false;

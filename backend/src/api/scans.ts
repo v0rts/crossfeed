@@ -49,11 +49,34 @@ interface ScanSchema {
 }
 
 export const SCAN_SCHEMA: ScanSchema = {
+  vulnSync: {
+    type: 'fargate',
+    isPassive: true,
+    global: true,
+    description: 'Pull in vulnerability data from PEs Vulnerability database',
+    cpu: '1024',
+    memory: '8192'
+  },
+  cveSync: {
+    type: 'fargate',
+    isPassive: true,
+    global: true,
+    description:
+      "Matches detected software versions to CVEs from NIST NVD and CISA's Known Exploited Vulnerabilities Catalog.",
+    cpu: '1024',
+    memory: '8192'
+  },
   testProxy: {
     type: 'fargate',
     isPassive: false,
     global: true,
     description: 'Not a real scan, used to test proxy'
+  },
+  test: {
+    type: 'fargate',
+    isPassive: false,
+    global: true,
+    description: 'Not a real scan, used to test'
   },
   censys: {
     type: 'fargate',
@@ -190,34 +213,6 @@ export const SCAN_SCHEMA: ScanSchema = {
     description:
       'Domain name permutation engine for detecting similar registered domains.'
   },
-  peDomMasq: {
-    type: 'fargate',
-    isPassive: true,
-    global: false,
-    description:
-      'Fetch DNSTwist data, check IPs on blocklist.de, then sync to PE db instance.'
-  },
-  peCybersixgill: {
-    type: 'fargate',
-    isPassive: true,
-    global: false,
-    description: 'Run P&E Cybersixgill scripts and add to PE db instance.'
-  },
-  peHibpSync: {
-    type: 'fargate',
-    isPassive: true,
-    global: false,
-    description: 'Fetch hibp data and sync it with the PE db instance.'
-  },
-  peShodan: {
-    type: 'fargate',
-    isPassive: true,
-    global: true,
-    cpu: '2048',
-    memory: '16384',
-    description:
-      'Run organization IPs through shodan and circl to find un/verified vulns and save them to PE db.'
-  },
   rootDomainSync: {
     type: 'fargate',
     isPassive: true,
@@ -230,6 +225,13 @@ export const SCAN_SCHEMA: ScanSchema = {
     isPassive: true,
     global: true,
     description: 'Performs saved searches to update their search results'
+  },
+  trustymail: {
+    type: 'fargate',
+    isPassive: true,
+    global: false,
+    description:
+      'Evaluates SPF/DMARC records and checks MX records for STARTTLS support'
   }
 };
 

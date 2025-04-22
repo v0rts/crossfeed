@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
+import { classes, StyledPaper } from './Styling/resultCardStyle';
 import clsx from 'classnames';
-import { makeStyles, Paper } from '@material-ui/core';
 import { Result } from '../../context/SearchProvider';
 // @ts-ignore:next-line
 import { parseISO, formatDistanceToNow } from 'date-fns';
@@ -58,7 +58,6 @@ const filterExpanded = (
 };
 
 export const ResultCard: React.FC<Props> = (props) => {
-  const classes = useStyles(props);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const {
     id,
@@ -159,7 +158,7 @@ export const ResultCard: React.FC<Props> = (props) => {
   }
 
   return (
-    <Paper
+    <StyledPaper
       elevation={0}
       classes={{ root: classes.root }}
       aria-label="view domain details"
@@ -216,89 +215,6 @@ export const ResultCard: React.FC<Props> = (props) => {
           </p>
         ))}
       </div>
-    </Paper>
+    </StyledPaper>
   );
 };
-
-const useStyles = makeStyles((theme) => ({
-  root: {
-    boxSizing: 'border-box',
-    marginBottom: '1rem',
-    border: ({ selected }: Props) =>
-      selected
-        ? `2px solid ${theme.palette.primary.main}`
-        : '2px solid #DCDEE0',
-    boxShadow: ({ selected }: Props) =>
-      selected ? '0px 1px 6px rgba(0, 0, 0, 0.25)' : 'none',
-    '& em': {
-      fontStyle: 'normal',
-      backgroundColor: 'yellow'
-    }
-  },
-  inner: {
-    padding: '1.5rem',
-    paddingTop: '0.875rem',
-    cursor: 'pointer'
-  },
-  domainRow: {
-    width: '100%',
-    display: 'flex',
-    flexFlow: 'row nowrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    color: '#28A0CB',
-    outline: 'none',
-    background: 'none',
-    border: 'none',
-    padding: '0.5rem 0',
-
-    '&:focus': {
-      outline: 'none !important'
-    },
-    '& h4': {
-      fontWeight: 400,
-      cursor: 'pointer',
-      display: 'block',
-      fontSize: '1.9rem',
-      color: '#07648D',
-      margin: 0,
-      textAlign: 'left',
-      wordBreak: 'break-all',
-      paddingRight: '1rem'
-    }
-  },
-  ipRow: {
-    display: 'flex',
-    flexFlow: 'row nowrap',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
-  row: {
-    padding: '0.5rem 0',
-    margin: 0
-  },
-  label: {
-    fontSize: '0.8rem',
-    color: '#71767A',
-    display: 'block'
-  },
-  count: {
-    color: theme.palette.error.light
-  },
-  data: {
-    display: 'block',
-    color: '#3D4551'
-  },
-  lastSeen: {
-    display: 'block',
-    textAlign: 'right'
-  },
-  expandMore: {
-    outline: 'none',
-    border: 'none',
-    background: 'none',
-    color: theme.palette.secondary.main,
-    margin: '0 0.2rem',
-    cursor: 'pointer'
-  }
-}));

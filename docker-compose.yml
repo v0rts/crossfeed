@@ -2,7 +2,7 @@ version: '3.4'
 
 services:
   db:
-    image: postgres:13
+    image: postgres:15.3
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
       - ./backend/db-init:/docker-entrypoint-initdb.d
@@ -15,6 +15,7 @@ services:
     environment:
       - POSTGRES_USER=${DB_USERNAME}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
+    command: ['postgres', '-c', 'log_statement=all', '-c', 'log_duration=on']
 
   frontend:
     build: ./frontend
@@ -59,7 +60,7 @@ services:
   docs:
     build:
       context: ./
-      dockerfile: ./docs/Dockerfile
+      dockerfile: ./Dockerfile.docs
     volumes:
       - ./docs/src:/app/docs/src
       - ./docs/gatsby-browser.js:/app/docs/gatsby-browser.js
@@ -102,7 +103,7 @@ services:
   #     LOGGING_QUIET: 'true'
 
   matomodb:
-    image: mariadb:10.5
+    image: mariadb:10.6
     command: --max-allowed-packet=64MB
     networks:
       - backend
@@ -131,6 +132,18 @@ services:
       - MATOMO_GENERAL_ASSUME_SECURE_PROTOCOL=1
     logging:
       driver: none
+  rabbitmq:
+    image: 'rabbitmq:3.8-management'
+    ports:
+      - '5672:5672' # RabbitMQ default port
+      - '15672:15672' # RabbitMQ management plugin
+    networks:
+      - backend
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
 
 volumes:
   postgres-data:
@@ -138,6 +151,7 @@ volumes:
   minio-data:
   matomo-db-data:
   matomo-data:
+  rabbitmq-data:
 
 networks:
   backend:

@@ -14,6 +14,23 @@ export interface Organization {
   tags: OrganizationTag[];
   parent: Organization | null;
   children: Organization[];
+  pendingDomains: PendingDomain[];
+  country?: string;
+  regionId?: string;
+  state?: string;
+  stateFips?: number;
+  stateName?: string;
+  county?: string;
+  countyFips?: number;
+  acronym: string;
+  type: string;
+  userCount?: number;
+  tagNames?: string[];
+}
+
+export interface PendingDomain {
+  name: string;
+  token: string;
 }
 
 export interface OrganizationTag {

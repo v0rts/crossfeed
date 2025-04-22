@@ -56,7 +56,11 @@ resource "aws_iam_role_policy" "worker_task_execution_role_policy" {
         "ecr:GetDownloadUrlForLayer",
         "ecr:BatchGetImage",
         "logs:CreateLogStream",
-        "logs:PutLogEvents"
+        "logs:PutLogEvents",
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage",
+        "sqs:ListQueues",
+        "sqs:GetQueueAttributes"
       ],
       "Resource": "*"
     },
@@ -81,10 +85,18 @@ resource "aws_iam_role_policy" "worker_task_execution_role_policy" {
           "${data.aws_ssm_parameter.hibp_api_key.arn}",
           "${data.aws_ssm_parameter.pe_shodan_api_keys.arn}",
           "${data.aws_ssm_parameter.sixgill_client_id.arn}",
+          "${data.aws_ssm_parameter.intelx_api_key.arn}",
           "${data.aws_ssm_parameter.sixgill_client_secret.arn}",
           "${data.aws_ssm_parameter.lg_api_key.arn}",
           "${data.aws_ssm_parameter.lg_workspace_name.arn}",
-          "${aws_ssm_parameter.es_endpoint.arn}"
+          "${data.aws_ssm_parameter.shodan_queue_url.arn}",
+          "${data.aws_ssm_parameter.dnstwist_queue_url.arn}",
+          "${data.aws_ssm_parameter.hibp_queue_url.arn}",
+          "${data.aws_ssm_parameter.intelx_queue_url.arn}",
+          "${data.aws_ssm_parameter.cybersixgill_queue_url.arn}",
+          "${aws_ssm_parameter.es_endpoint.arn}",
+          "${data.aws_ssm_parameter.pe_api_key.arn}",
+          "${data.aws_ssm_parameter.cf_api_key.arn}"
         ]
     }
   ]
@@ -144,6 +156,16 @@ resource "aws_iam_role_policy" "worker_task_role_policy" {
       "Resource": [
         "${aws_s3_bucket.export_bucket.arn}"
       ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage",
+        "sqs:ListQueues",
+        "sqs:GetQueueAttributes"
+      ],
+      "Resource": "*"
     }
   ]
 }
@@ -284,6 +306,14 @@ resource "aws_ecs_task_definition" "worker" {
       {
         "name": "ELASTICSEARCH_ENDPOINT",
         "valueFrom": "${aws_ssm_parameter.es_endpoint.arn}"
+      },
+      {
+        "name": "PE_API_KEY",
+        "valueFrom": "${data.aws_ssm_parameter.pe_api_key.arn}"
+      },
+      {
+        "name": "CF_API_KEY",
+        "valueFrom": "${data.aws_ssm_parameter.cf_api_key.arn}"
       }
     ]
   }
@@ -327,6 +357,8 @@ data "aws_ssm_parameter" "pe_shodan_api_keys" { name = var.ssm_pe_shodan_api_key
 
 data "aws_ssm_parameter" "sixgill_client_id" { name = var.ssm_sixgill_client_id }
 
+data "aws_ssm_parameter" "intelx_api_key" { name = var.ssm_intelx_api_key }
+
 data "aws_ssm_parameter" "sixgill_client_secret" { name = var.ssm_sixgill_client_secret }
 
 data "aws_ssm_parameter" "pe_db_name" { name = var.ssm_pe_db_name }
@@ -343,12 +375,50 @@ data "aws_ssm_parameter" "worker_signature_public_key" { name = var.ssm_worker_s
 
 data "aws_ssm_parameter" "worker_signature_private_key" { name = var.ssm_worker_signature_private_key }
 
+data "aws_ssm_parameter" "shodan_queue_url" { name = var.ssm_shodan_queue_url }
+
+data "aws_ssm_parameter" "dnstwist_queue_url" { name = var.ssm_dnstwist_queue_url }
+
+data "aws_ssm_parameter" "hibp_queue_url" { name = var.ssm_hibp_queue_url }
+
+data "aws_ssm_parameter" "intelx_queue_url" { name = var.ssm_intelx_queue_url }
+
+data "aws_ssm_parameter" "cybersixgill_queue_url" { name = var.ssm_cybersixgill_queue_url }
+
+data "aws_ssm_parameter" "pe_api_key" { name = var.ssm_pe_api_key }
+
+data "aws_ssm_parameter" "cf_api_key" { name = var.ssm_cf_api_key }
+
 resource "aws_s3_bucket" "export_bucket" {
   bucket = var.export_bucket_name
   tags = {
     Project = var.project
     Stage   = var.stage
   }
+}
+
+resource "aws_s3_bucket_policy" "export_bucket" {
+  bucket = var.export_bucket_name
+  policy = jsonencode({
+    "Version" : "2012-10-17"
+    "Statement" : [
+      {
+        "Sid" : "RequireSSLRequests"
+        "Action" : "s3:*",
+        "Effect" : "Deny"
+        "Principal" : "*"
+        "Resource" : [
+          aws_s3_bucket.export_bucket.arn,
+          "${aws_s3_bucket.export_bucket.arn}/*"
+        ]
+        "Condition" : {
+          "Bool" : {
+            "aws:SecureTransport" : false
+          }
+        }
+      }
+    ]
+  })
 }
 
 resource "aws_s3_bucket_acl" "export_bucket" {

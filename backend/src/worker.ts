@@ -17,14 +17,15 @@ import { handler as webscraper } from './tasks/webscraper';
 import { handler as shodan } from './tasks/shodan';
 import { handler as testProxy } from './tasks/test-proxy';
 import { handler as hibp } from './tasks/hibp';
-import { handler as peCybersixgill } from './tasks/peCybersixgill';
 import { handler as lookingGlass } from './tasks/lookingGlass';
 import { handler as dnstwist } from './tasks/dnstwist';
 import { handler as rootDomainSync } from './tasks/rootDomainSync';
-import { handler as peShodan } from './tasks/peShodan';
-import { handler as peDomMasq } from './tasks/peDomMasq';
-import { handler as peHibpSync } from './tasks/peHibpSync';
+import { handler as trustymail } from './tasks/trustymail';
+import { handler as cveSync } from './tasks/cve-sync';
+import { handler as vulnSync } from './tasks/vuln-sync';
 import { SCAN_SCHEMA } from './api/scans';
+import { connectToDatabase } from './models';
+import fetchPublicSuffixList from './tasks/helpers/fetchPublicSuffixList';
 
 /**
  * Worker entrypoint.
@@ -35,13 +36,14 @@ async function main() {
   );
   console.log('commandOptions are', commandOptions);
 
-  const { scanName = 'testProxy', organizations = [] } = commandOptions;
+  const { scanName = 'test', organizations = [] } = commandOptions;
 
-  const scanFn = {
+  const scanFn: any = {
     amass,
     censys,
     censysIpv4,
     censysCertificates,
+    cveSync,
     sslyze,
     searchSync,
     cve,
@@ -54,14 +56,16 @@ async function main() {
     savedSearch,
     shodan,
     hibp,
-    peCybersixgill,
     lookingGlass,
     dnstwist,
     testProxy,
     rootDomainSync,
-    peShodan,
-    peDomMasq,
-    peHibpSync
+    trustymail,
+    vulnSync,
+    test: async () => {
+      await connectToDatabase();
+      console.log('test');
+    }
   }[scanName];
   if (!scanFn) {
     throw new Error('Invalid scan name ' + scanName);
@@ -71,6 +75,10 @@ async function main() {
     // No proxy
   } else {
     bootstrap();
+  }
+
+  if (scanName === 'trustymail') {
+    await fetchPublicSuffixList();
   }
 
   const { global } = SCAN_SCHEMA[scanName];
